@@ -42,7 +42,7 @@ Use /update to update info about you and use /info to check info about yourself
 .env Configuration
 Create a .env file in your project root directory.
 
-Save your Bot token and your Api key for chat bot inside the file.
+Save your Bot token and your Api key for chat bot inside the file. : Like this : TOKEN = 'BOT-TOKEN-HERE'
 
 SetUp Digital Environment
 Execute these commands in order to set up your virtual environment:
