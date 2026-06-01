@@ -1,0 +1,5 @@
+PLZ Download the followwing librries to run the code:
+pip install pyTelegramBotAPI
+pip install dotenv
+pip install sqlite3
+and import os
