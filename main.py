@@ -8,9 +8,7 @@ from logic import BotFunc
 
 dotenv.load_dotenv()
 bot = TeleBot(os.getenv('TOKEN'))
-
-Users = []
-bot_logic = BotFunc('users.db')
+bot_func = BotFunc("users.db")
 
 
 @bot.message_handler(commands=['help'])
@@ -34,56 +32,46 @@ def start(message):
 
 @bot.message_handler(commands=['register'])
 def registration(message):
-    global Users
     bot.send_message(message.chat.id, 'Please enter your username:')
-    Users.append({'UserID' : message.from_user.id, 'User_Name' : None, 'Age' : None, 'degree_YN' : None, 'Speciality' : None, 'Have_Device_Laptop' : None, 'State' : 'Awaiting_Name'})
+    bot_func.add_user(user_id=message.from_user.id, username=None, age=None, degree_yn=None, speciality=None, have_device_laptop=None)
 
 @bot.message_handler(func = lambda message: True)
 def forAll(message):
-    global Users
-    for User in Users:
-        if User['UserID'] == message.from_user.id:
-
-            if User['State'] == 'Awaiting_Name':
-                User['User_Name'] = message.text
-                User['State'] = 'Awaiting_Age'
+    users =bot_func.get_users()
+    for user in users:
+        if user[1] == message.from_user.id:  # user[1] is the user_id
+            if user[7] == 'Awaiting_Name':
                 bot.send_message(message.chat.id, 'Please enter your age:')
                 continue
 
-            if User['State'] == 'Awaiting_Age':
+            if user[7] == 'Awaiting_Age':
                 try:
-                    User['Age'] = int(message.text)
+                    age = int(message.text)
+                    pass
                 except ValueError:
-                    bot.send_message(message.chat.id, 'Invalid input for age. Please enter a valid number:')
+                    bot.send_message(message.chat.id, 'Invalid input for age. Please enter a valid number:', age)
                     continue
-                User['State'] = 'Awaiting_Degree'
                 bot.send_message(message.chat.id, 'Do you have a degree? (Yes/No)')
                 continue
 
-            if User['State'] == 'Awaiting_Degree':
-                User['degree_YN'] = message.text
-                User['State'] = 'Awaiting_Speciality'
+            if user[7] == 'Awaiting_Degree':
                 bot.send_message(message.chat.id, 'What is your speciality?')
                 continue    
 
-            if User['State'] == 'Awaiting_Speciality':
-                User['Speciality'] = message.text
-                User['State'] = 'Awaiting_Device'
+            if user[7] == 'Awaiting_Speciality':
                 bot.send_message(message.chat.id, 'Do you have a laptop? (Yes/No)')
                 continue   
 
-            if User['State'] == 'Awaiting_Device':
-                User['Have_Device_Laptop'] = message.text
-                User['State'] = 'Registered'
-                print(User)
-                bot_logic.register_user(user_id=User['UserID'], username=User['User_Name'], age=User['Age'], degree_yn=User['degree_YN'], speciality=User['Speciality'], have_device_laptop=User['Have_Device_Laptop'])
+            if user[7] == 'Awaiting_Device':
+                print(user)
+                bot_func.register_user(user_id=user[1], username=user[2], age=user[3], degree_yn=user[4], speciality=user[5], have_device_laptop=user[6])
                 bot.send_message(message.chat.id, 'You have successfully registered!\nYour information:\n' \
-                                                      f'Username: {User["User_Name"]}\n' \
-                                                      f'Age: {User["Age"]}\n' \
-                                                      f'Degree: {User["degree_YN"]}\n' \
-                                                      f'Speciality: {User["Speciality"]}\n' \
-                                                      f'Laptop: {User["Have_Device_Laptop"]}')
-                Users.remove(User)
+                                                      f'Username: {user[2]}\n' \
+                                                      f'Age: {user[3]}\n' \
+                                                      f'Degree: {user[4]}\n' \
+                                                      f'Speciality: {user[5]}\n' \
+                                                      f'Laptop: {user[6]}')
+                bot_func.delete_user(user_id=message.from_user.id)
                 continue
 
 bot.delete_my_commands(scope=None, language_code=None)
