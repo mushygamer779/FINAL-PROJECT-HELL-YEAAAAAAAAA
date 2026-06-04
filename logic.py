@@ -19,8 +19,7 @@ class BotFunc:
                                 have_device_laptop TEXT
                             )''')
         self.conn.commit()
-        # self.conn.close() # зачем закрывать соединение после создания таблицы? можно удалить эту строку и оставить соединение открытым для дальнейшего использования.
-# а вот увидела регистрацию
+        
     def register_user(self, user_id, username, age, degree_yn, speciality, have_device_laptop):
         self.cursor.execute('''INSERT OR IGNORE INTO users 
                                (user_id, username, age, degree_yn, speciality, have_device_laptop)
@@ -28,6 +27,21 @@ class BotFunc:
                             (user_id, username, age, degree_yn, speciality, have_device_laptop))
         self.conn.commit()
         self.conn.close()
+    
+    def update_user(self, user_id, username=None, age=None, degree_yn=None, speciality=None, have_device_laptop=None):
+        if username is not None:
+            self.cursor.execute('''UPDATE users SET username = ? WHERE user_id = ?''', (username, user_id))
+        if age is not None:
+            self.cursor.execute('''UPDATE users SET age = ? WHERE user_id = ?''', (age, user_id))
+        if degree_yn is not None:
+            self.cursor.execute('''UPDATE users SET degree_yn = ? WHERE user_id = ?''', (degree_yn, user_id))
+        if speciality is not None:
+            self.cursor.execute('''UPDATE users SET speciality = ? WHERE user_id = ?''', (speciality, user_id))
+        if have_device_laptop is not None:
+            self.cursor.execute('''UPDATE users SET have_device_laptop = ? WHERE user_id = ?''', (have_device_laptop, user_id))
+        self.conn.commit()
+
+
  # создай добавление пользователя в базу данных при регистрации, чтобы не держать всех пользователей в памяти. при регистрации пользователя, сохраняй его данные в базе данных, а не в списке Users. тогда тебе не нужно будет использовать глобальную переменную Users и работать с ней, а просто сохранять данные в базе данных и при необходимости извлекать их оттуда.
     def add_user(self, user_id, username, age, degree_yn, speciality, have_device_laptop):
         self.cursor.execute('''INSERT INTO users (user_id, username, age, degree_yn, speciality, have_device_laptop) 

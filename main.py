@@ -3,7 +3,7 @@ from telebot import TeleBot
 import dotenv
 import telebot
 import os
-from logic import BotFunc
+from logic import BotFunc 
 
 
 dotenv.load_dotenv()
@@ -37,10 +37,13 @@ def registration(message):
 
 @bot.message_handler(func = lambda message: True)
 def forAll(message):
-    users =bot_func.get_users()
+    users = bot_func.get_users()
+    print(users)
     for user in users:
         if user[1] == message.from_user.id:  # user[1] is the user_id
             if user[7] == 'Awaiting_Name':
+                text = message.text
+                bot_func.update_user(user_id=user[1], username=text, status='Awaiting_Age')
                 bot.send_message(message.chat.id, 'Please enter your age:')
                 continue
 
@@ -95,4 +98,6 @@ print([c.to_json() for c in cmd])
 
 
 if __name__ == '__main__':
+    user = bot_func.get_users()
+    print(user)
     bot.infinity_polling()
