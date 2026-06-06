@@ -4,7 +4,7 @@ Welcome to **BOT RIZZLER**! Below you will find the available commands, required
 
 ---
 
-## 🚀 Available Commands
+## Available Commands
 
 | Command | Description |
 | :--- | :--- |
@@ -19,7 +19,7 @@ Welcome to **BOT RIZZLER**! Below you will find the available commands, required
 
 ---
 
-## 📦 Libraries Used
+## Libraries Used
 
 Run the following commands to install the required dependencies:
 
@@ -27,7 +27,7 @@ Run the following commands to install the required dependencies:
 pip install PytelegramBotAPI
 pip install Sqlite3
 pip install dotenv
-📖 How to Use
+How to Use
 Use /Start
 
 Register using /register
@@ -38,7 +38,7 @@ Use /recommend to get recommended something
 
 Use /update to update info about you and use /info to check info about yourself
 
-⚙️ More SetUp
+More SetUp
 .env Configuration
 Create a .env file in your project root directory.
 
