@@ -3,14 +3,14 @@ from telebot import TeleBot
 import dotenv
 import telebot
 import os
-from logic import BotFunc
+from logic import BotFunc as BotFunc
 
 
 dotenv.load_dotenv()
 bot = TeleBot(os.getenv('TOKEN'))
 
 
-bot_logic = BotFunc('users.db')
+bot_logic = BotFunc('tegUsers.db')
 
 
 @bot.message_handler(commands=['help'])
@@ -32,57 +32,58 @@ def start(message):
 
 @bot.message_handler(commands=['register'])
 def registration(message):
-    users = []
-    bot.send_message(message.chat.id, 'Please enter your username:')
-    bot_logic.register_user(user_id=message.from_user.id, username=None, age=None, degree_yn=None, speciality=None, have_device_laptop=None, state='Awaiting_Name')
-
-
+    users = bot_logic.showAllUsers()
+    for user in users: 
+        if user['user_id'] == message.from_user.id:
+            bot.send_message(message.chat.id, 'You are already registered! Use /update to change your information.')
+            return
+        else:
+            bot.send_message(message.chat.id, 'You are not registered yet. Please follow the prompts to register.')
+            bot.send_message(message.chat.id, 'Please enter your username:') 
 @bot.message_handler(func = lambda message: True)
 def forAll(message):
-    global Users
-    for User in Users:
-        if User['UserID'] == message.from_user.id:
+    global bot_logic
+    users = bot_logic.showAllUsers()
 
-            if User['State'] == 'Awaiting_Name':
-                User['User_Name'] = message.text
-                User['State'] = 'Awaiting_Age'
+    for User in users:
+        if User['user_id'] == message.from_user.id:
+            if User['state'] == 'Awaiting_Name':
+                bot_logic.update_user(user_id=User['user_id'], username=message.text, age=None, degree_yn=None, speciality=None, have_device_laptop=None, state='Awaiting_Age')
                 bot.send_message(message.chat.id, 'Please enter your age:')
                 continue
-
-            if User['State'] == 'Awaiting_Age':
+            
+            if User['state'] == 'Awaiting_Age':
                 try:
-                    User['Age'] = int(message.text)
+                    bot_logic.update_user(user_id=User['user_id'], username=None, age=int(message.text), degree_yn=None, speciality=None, have_device_laptop=None, state='Awaiting_Degree')
                 except ValueError:
                     bot.send_message(message.chat.id, 'Invalid input for age. Please enter a valid number:')
                     continue
-                User['State'] = 'Awaiting_Degree'
+                
                 bot.send_message(message.chat.id, 'Do you have a degree? (Yes/No)')
                 continue
 
-            if User['State'] == 'Awaiting_Degree':
-                User['degree_YN'] = message.text
-                User['State'] = 'Awaiting_Speciality'
+            if User['state'] == 'Awaiting_Degree':
+                bot_logic.update_user(user_id=User['user_id'], username=None, age=None, degree_yn=message.text, speciality=None, have_device_laptop=None, state='Awaiting_Speciality')
                 bot.send_message(message.chat.id, 'What is your speciality?')
                 continue    
 
-            if User['State'] == 'Awaiting_Speciality':
-                User['Speciality'] = message.text
-                User['State'] = 'Awaiting_Device'
+            if User['state'] == 'Awaiting_Speciality':
+                bot_logic.update_user(user_id=User['user_id'], username=None, age=None, degree_yn=None, speciality=message.text, have_device_laptop=None, state='Awaiting_Device')
                 bot.send_message(message.chat.id, 'Do you have a laptop? (Yes/No)')
                 continue   
 
-            if User['State'] == 'Awaiting_Device':
-                User['Have_Device_Laptop'] = message.text
-                User['State'] = 'Registered'
-                print(User)
-                bot_logic.register_user(user_id=User['UserID'], username=User['User_Name'], age=User['Age'], degree_yn=User['degree_YN'], speciality=User['Speciality'], have_device_laptop=User['Have_Device_Laptop'])
-                bot.send_message(message.chat.id, 'You have successfully registered!\nYour information:\n' \
-                                                      f'Username: {User["User_Name"]}\n' \
-                                                      f'Age: {User["Age"]}\n' \
-                                                      f'Degree: {User["degree_YN"]}\n' \
-                                                      f'Speciality: {User["Speciality"]}\n' \
-                                                      f'Laptop: {User["Have_Device_Laptop"]}')
-                Users.remove(User)
+            if User['state'] == 'Awaiting_Device':
+                bot_logic.update_user(user_id=User['user_id'], have_device_laptop=message.text, state='Registered')
+                # Re-fetch the now-complete user record
+                updated = next(u for u in bot_logic.showAllUsers() if u['user_id'] == message.from_user.id)
+                bot.send_message(message.chat.id,
+                    'You have successfully registered!\nYour information:\n'
+                    f'Username: {updated["username"]}\n'
+                    f'Age: {updated["age"]}\n'
+                    f'Degree: {updated["degree_yn"]}\n'
+                    f'Speciality: {updated["speciality"]}\n'
+                    f'Laptop: {updated["have_device_laptop"]}'
+                )
                 continue
 
 bot.delete_my_commands(scope=None, language_code=None)
