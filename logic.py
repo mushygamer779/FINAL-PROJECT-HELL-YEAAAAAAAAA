@@ -75,4 +75,4 @@ if __name__ == "__main__":
     bot_func = BotFunc("tegUsers.db")
     bot_func.create_table()
     print("This is the logic module.")
-    
+    # bot_func.delete_user('6666483906')

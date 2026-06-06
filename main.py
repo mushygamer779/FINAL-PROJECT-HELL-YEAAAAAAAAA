@@ -37,9 +37,10 @@ def registration(message):
         if user['user_id'] == message.from_user.id:
             bot.send_message(message.chat.id, 'You are already registered! Use /update to change your information.')
             return
-        else:
-            bot.send_message(message.chat.id, 'You are not registered yet. Please follow the prompts to register.')
-            bot.send_message(message.chat.id, 'Please enter your username:') 
+    bot.send_message(message.chat.id, 'You are not registered yet. Please follow the prompts to register.')
+    bot.send_message(message.chat.id, 'Please enter your username:') 
+    bot_logic.register_user(user_id=message.from_user.id, username=None, age=None, degree_yn=None, speciality=None, have_device_laptop=None, state='Awaiting_Name')
+
 @bot.message_handler(func = lambda message: True)
 def forAll(message):
     global bot_logic
@@ -54,7 +55,15 @@ def forAll(message):
             
             if User['state'] == 'Awaiting_Age':
                 try:
-                    bot_logic.update_user(user_id=User['user_id'], username=None, age=int(message.text), degree_yn=None, speciality=None, have_device_laptop=None, state='Awaiting_Degree')
+                    if int(message.text) <= 0 or int(message.text) < 6:
+                        bot.send_message(message.chat.id, 'fetus cant type. Please enter a valid age:')
+                        continue
+                    elif int(message.text) > 120:
+                        bot.send_message(message.chat.id, 'how are you still jobless? Please enter a valid age:')
+                        continue
+                    else:
+                        bot_logic.update_user(user_id=User['user_id'], username=None, age=int(message.text), degree_yn=None, speciality=None, have_device_laptop=None, state='Awaiting_Degree')
+                        
                 except ValueError:
                     bot.send_message(message.chat.id, 'Invalid input for age. Please enter a valid number:')
                     continue
@@ -63,9 +72,14 @@ def forAll(message):
                 continue
 
             if User['state'] == 'Awaiting_Degree':
-                bot_logic.update_user(user_id=User['user_id'], username=None, age=None, degree_yn=message.text, speciality=None, have_device_laptop=None, state='Awaiting_Speciality')
-                bot.send_message(message.chat.id, 'What is your speciality?')
-                continue    
+          
+                if message.text.lower() not in ['yes', 'no', 'yea', 'ye', 'yez', 'na', 'nah']:
+                    bot.send_message(message.chat.id, 'Yes or no?')
+                    continue
+                else: 
+                    bot_logic.update_user(user_id=User['user_id'], username=None, age=None, degree_yn=message.text, speciality=None, have_device_laptop=None, state='Awaiting_Speciality')
+                    bot.send_message(message.chat.id, 'What is your speciality?')
+                    continue    
 
             if User['state'] == 'Awaiting_Speciality':
                 bot_logic.update_user(user_id=User['user_id'], username=None, age=None, degree_yn=None, speciality=message.text, have_device_laptop=None, state='Awaiting_Device')
@@ -73,18 +87,22 @@ def forAll(message):
                 continue   
 
             if User['state'] == 'Awaiting_Device':
-                bot_logic.update_user(user_id=User['user_id'], have_device_laptop=message.text, state='Registered')
-                # Re-fetch the now-complete user record
-                updated = next(u for u in bot_logic.showAllUsers() if u['user_id'] == message.from_user.id)
-                bot.send_message(message.chat.id,
-                    'You have successfully registered!\nYour information:\n'
-                    f'Username: {updated["username"]}\n'
-                    f'Age: {updated["age"]}\n'
-                    f'Degree: {updated["degree_yn"]}\n'
-                    f'Speciality: {updated["speciality"]}\n'
-                    f'Laptop: {updated["have_device_laptop"]}'
-                )
-                continue
+                if message.text.lower() not in ['yes', 'no', 'yea', 'ye', 'yez', 'na', 'nah']:
+                    bot.send_message(message.chat.id, 'Yes or no?')
+                    continue
+                else: 
+                    bot_logic.update_user(user_id=User['user_id'], have_device_laptop=message.text, state='Registered')
+                    # Re-fetch the now-complete user record
+                    updated = next(u for u in bot_logic.showAllUsers() if u['user_id'] == message.from_user.id)
+                    bot.send_message(message.chat.id,
+                        'You have successfully registered!\nYour information:\n'
+                        f'Username: {updated["username"]}\n'
+                        f'Age: {updated["age"]}\n'
+                        f'Degree: {updated["degree_yn"]}\n'
+                        f'Speciality: {updated["speciality"]}\n'
+                        f'Laptop: {updated["have_device_laptop"]}'
+                    )
+                    continue
 
 bot.delete_my_commands(scope=None, language_code=None)
 
