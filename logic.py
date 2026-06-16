@@ -1,4 +1,9 @@
 import sqlite3
+import requests
+import json
+import os
+from dotenv import load_dotenv
+
 
 class BotFunc:
     def __init__(self, db_name):
@@ -70,9 +75,109 @@ class BotFunc:
         self.conn.commit()
    
 
+    def recommend(self, age: int, has_degree: str, specialty: str, have_device_laptop: str) -> str:
+        """
+        Generate personalized wealth-building advice using the Google Gemini API.
+
+        Args:
+            age                (int): The person's age, e.g. 27
+            has_degree         (str): "yes" or "no"
+            specialty          (str): Field of study or experience, e.g. "Computer Science"
+            have_device_laptop (str): "yes" or "no"
+
+        Returns:
+            str: Step-by-step wealth-building roadmap
+
+        Example:
+            >>> print(recommend(27, "yes", "Computer Science", "yes"))
+        """
+
+        # ── Load env & build URL ──────────────────────────────────────────
+        load_dotenv()
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={os.getenv('GeminiAPI')}"
+
+        # ── Normalise inputs ──────────────────────────────────────────────
+        has_degree         = str(has_degree).strip().lower()
+        have_device_laptop = str(have_device_laptop).strip().lower()
+        specialty          = str(specialty).strip()
+
+        # ── Build the prompt ──────────────────────────────────────────────
+        prompt = f"""You are a world-class financial strategist, entrepreneur, and career coach.
+
+            A person has come to you with the following profile:
+            - Age: {age}
+            - Has a University Degree: {has_degree}
+            - Field of Specialty / Experience: {specialty}
+            - Has a Laptop: {have_device_laptop}
+
+            Your job is to help this person build serious wealth from where they are right now.
+
+            Do the following:
+            1. Analyse the CURRENT market opportunity in their specialty field (2-3 sentences). What is hot, what pays well, what is growing fast?
+            2. Based on their profile and market analysis, give them a brutally honest, actionable, step-by-step roadmap to build wealth.
+            3. Each step must be SPECIFIC — not "learn Python", but "spend 2 hours daily on Python via freeCodeCamp for 3 months then build 2 portfolio projects".
+            4. Consider their age, whether their degree adds value or they need to self-learn, and whether having no laptop limits them (and how to work around it).
+            5. Include income milestones and realistic timelines.
+
+            Format your response EXACTLY like this:
+
+            **Market Opportunity Analysis:**
+            [2-3 sentences on current market trends, demand, and earning potential in their field]
+
+            **Your Wealth-Building Roadmap:**
+            [One motivating sentence tailored to their profile]
+
+            **Step-by-Step Action Plan:**
+            1. [Specific action — include what, how, how long]
+            2. [Specific action — include what, how, how long]
+            3. [Keep going for 7-10 steps]
+
+            **Income Milestones:**
+            - Month 3: [Realistic earning expectation]
+            - Month 6: [Realistic earning expectation]
+            - Year 1:  [Realistic earning expectation]
+            - Year 3:  [Realistic earning expectation]
+
+            **Timeline to First $10,000:**
+            [Honest, specific estimate based on their profile]"""
+
+        # ── Call the Gemini REST API ──────────────────────────────────────
+        payload = {
+            "contents": [
+                {
+                    "parts": [{"text": prompt}]
+                }
+            ],
+            "generationConfig": {
+                "temperature": 0.7,
+                "maxOutputTokens": 1024,
+            }
+        }
+
+        headers = {"Content-Type": "application/json"}
+
+        response = requests.post(url, headers=headers, data=json.dumps(payload))
+
+        if response.status_code != 200:
+            raise RuntimeError(
+                f"Gemini API error {response.status_code}: {response.text}"
+            )
+
+        data = response.json()
+
+        # ── Extract the text ──────────────────────────────────────────────
+        try:
+            advice = data["candidates"][0]["content"]["parts"][0]["text"]
+        except (KeyError, IndexError) as e:
+            raise RuntimeError(f"Unexpected response structure: {data}") from e
+
+        return advice
+
+
 
 if __name__ == "__main__":
     bot_func = BotFunc("tegUsers.db")
     bot_func.create_table()
     print("This is the logic module.")
     # bot_func.delete_user('6666483906')
+    print(bot_func.recommend(age=27, has_degree="yes", specialty="Computer Science", have_device_laptop="yes"))

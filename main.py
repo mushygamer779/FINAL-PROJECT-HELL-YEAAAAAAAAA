@@ -19,8 +19,8 @@ def help(message):
                                       '/start - Start the bot\n'
                                       '/register - Register an account\n'
                                       '/recommend - Get job recommendations\n'
-                                      '/view - View your information\n'
                                       '/delete - Delete your information\n'
+                                      '/view - View your information\n'
                                       '/update - Update your information\n'
                                       '/help - Show this help message')
 
@@ -40,6 +40,57 @@ def registration(message):
     bot.send_message(message.chat.id, 'You are not registered yet. Please follow the prompts to register.')
     bot.send_message(message.chat.id, 'Please enter your username:') 
     bot_logic.register_user(user_id=message.from_user.id, username=None, age=None, degree_yn=None, speciality=None, have_device_laptop=None, state='Awaiting_Name')
+
+
+@bot.message_handler(commands=['recommend'])
+def recommend(message):
+    users = bot_logic.showAllUsers()
+    for User in users:
+        if User['user_id'] == message.from_user.id:
+            if User['state'] != 'Registered':
+                bot.send_message(message.chat.id, 'Please complete your registration first using /register.')
+                return
+            else:
+                recommendation = bot_logic.recommend(age=User['age'], has_degree=User['degree_yn'], specialty=User['speciality'], have_device_laptop=User['have_device_laptop'])
+                bot.send_message(message.chat.id, f'Based on your information here is the recommendation:\n{recommendation}')
+                return
+
+
+
+@bot.message_handler(commands=['view'])
+def view(message):
+    users = bot_logic.showAllUsers()
+    for User in users:
+        if User['user_id'] == message.from_user.id:
+            if User['state'] != 'Registered':
+                bot.send_message(message.chat.id, 'Please complete your registration first using /register.')
+                return
+            else:
+                bot.send_message(message.chat.id, f'Here is your current information:\n'
+                                                   f'Age: {User["age"]}\n'
+                                                   f'Has Degree: {User["degree_yn"]}\n'
+                                                   f'Specialty: {User["speciality"]}\n'
+                                                   f'Have Laptop: {User["have_device_laptop"]}')
+                return
+            
+
+@bot.message_handler(commands=['update'])
+def update(message):
+    users = bot_logic.showAllUsers()
+    for User in users:
+        if User['user_id'] == message.from_user.id:
+            if User['state'] != 'Registered':
+                bot.send_message(message.chat.id, 'Please complete your registration first using /register.')
+                return
+            else:
+                bot.send_message(message.chat.id, 'To update your information, please follow the prompts.')
+                bot.send_message(message.chat.id, 'Please enter your new username (or type "skip" to keep current):')
+                bot_logic.update_user(user_id=User['user_id'], username=None, age=None, degree_yn=None, speciality=None, have_device_laptop=None, state='Updating_Name')
+                return
+
+
+
+
 
 @bot.message_handler(func = lambda message: True)
 def forAll(message):
@@ -104,6 +155,60 @@ def forAll(message):
                     )
                     continue
 
+            if User['state'] == 'Updating_Name':
+                bot_logic.update_user(user_id=User['user_id'], username=message.text if message.text.lower() != 'skip' else None, age=None, degree_yn=None, speciality=None, have_device_laptop=None, state='Updating_Age')
+                bot.send_message(message.chat.id, 'Please enter your new age (or type "skip" to keep current):')
+                continue
+            if User['state'] == 'Updating_Age':
+                if message.text.lower() != 'skip':
+                    try:
+                        if int(message.text) <= 0 or int(message.text) < 6:
+                            bot.send_message(message.chat.id, 'fetus cant type. Please enter a valid age:')
+                            continue
+                        elif int(message.text) > 120:
+                            bot.send_message(message.chat.id, 'how are you still jobless? Please enter a valid age:')
+                            continue
+                        else:
+                            bot_logic.update_user(user_id=User['user_id'], username=None, age=int(message.text), degree_yn=None, speciality=None, have_device_laptop=None, state='Updating_Degree')
+                    except ValueError:
+                        bot.send_message(message.chat.id, 'Invalid input for age. Please enter a valid number:')
+                        continue
+                else:
+                    bot_logic.update_user(user_id=User['user_id'], username=None, age=None, degree_yn=None, speciality=None, have_device_laptop=None, state='Updating_Degree')
+                bot.send_message(message.chat.id, 'Do you have a degree? (Yes/No or "skip")')
+                continue
+            if User['state'] == 'Updating_Degree':
+                if message.text.lower() not in ['yes', 'no', 'yea', 'ye', 'yez', 'na', 'nah', 'skip']:
+                    bot.send_message(message.chat.id, 'Yes or no? (or "skip")')
+                    continue
+                else: 
+                    bot_logic.update_user(user_id=User['user_id'], username=None, age=None, degree_yn=message.text if message.text.lower() != 'skip' else None, speciality=None, have_device_laptop=None, state='Updating_Speciality')
+                    bot.send_message(message.chat.id, 'What is your speciality? (or "skip")')
+                    continue
+            if User['state'] == 'Updating_Speciality':
+                bot_logic.update_user(user_id=User['user_id'], username=None, age=None, degree_yn=None, speciality=message.text if message.text.lower() != 'skip' else None, have_device_laptop=None, state='Updating_Device')
+                bot.send_message(message.chat.id, 'Do you have a laptop? (Yes/No or "skip")')
+                continue                       
+
+            if User['state'] == 'Updating_Device':
+                if message.text.lower() not in ['yes', 'no', 'yea', 'ye', 'yez', 'na', 'nah', 'skip']:
+                    bot.send_message(message.chat.id, 'Yes or no? (or "skip")')
+                    continue
+                else: 
+                    bot_logic.update_user(user_id=User['user_id'], username=None, age=None, degree_yn=None, speciality=None, have_device_laptop=message.text if message.text.lower() != 'skip' else None, state='Registered')
+                    updated = next(u for u in bot_logic.showAllUsers() if u['user_id'] == message.from_user.id)
+                    bot.send_message(message.chat.id,
+                        'Your information has been updated!\nYour current information:\n'
+                        f'Username: {updated["username"]}\n'
+                        f'Age: {updated["age"]}\n'
+                        f'Degree: {updated["degree_yn"]}\n'
+                        f'Speciality: {updated["speciality"]}\n'
+                        f'Laptop: {updated["have_device_laptop"]}'
+                    )
+                    continue
+
+
+
 bot.delete_my_commands(scope=None, language_code=None)
 
 bot.set_my_commands(
@@ -122,8 +227,6 @@ bot.set_my_commands(
 # check command
 cmd = bot.get_my_commands(scope=None, language_code=None)
 print([c.to_json() for c in cmd])
-
-bot.infinity_polling()
 
 if __name__ == '__main__':
     print("Bot is running...")
