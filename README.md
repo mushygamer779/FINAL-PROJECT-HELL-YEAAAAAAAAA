@@ -1,53 +1,55 @@
 # Career Roadmap Telegram Bot
 
-A Telegram bot that collects a user's professional profile and generates a personalized, real-world roadmap for earning their first $100,000 while unemployed. Recommendations are produced by the Google Gemini API and tailored to each user's age, education, field of specialty, available equipment, and self-reported skills.
+This is a Telegram bot that gives you a personalized, no-nonsense plan for making your first $100,000 while you're unemployed. You tell it a bit about yourself, and it uses Google's Gemini AI to write a roadmap built around your actual situation: your age, whether you have a degree, what you're good at, whether you own a laptop, and any skills you've picked up along the way.
 
-## Overview
+The idea is simple. Generic career advice is useless because it ignores who you actually are. So this bot collects the details that matter, remembers them, and feeds them to the AI so the advice is genuinely about you.
 
-The bot guides each user through a short registration survey, stores their information in a local SQLite database, and lets them request an AI-generated career and income roadmap on demand. Users can also record individual skills (with years of experience and a short description), which are fed into the recommendation to produce more accurate, personalized advice.
+## How it's put together
 
-The project is split into two modules:
+The code lives in two files, each with a clear job:
 
-- `main.py` — the Telegram interface layer. Handles commands, the conversational survey flow, and message delivery.
-- `logic.py` — the data and AI layer. Manages the SQLite database and the Gemini API request that generates recommendations.
+- `main.py` is everything the user touches. It handles the commands, walks people through the questions, and sends messages back.
+- `logic.py` is the brain behind the scenes. It talks to the database and to the Geminsi API.
 
-## Features
+Keeping them separate means you can mess with the conversation flow without touching the AI logic, and vice versa.
 
-- User registration through a guided, multi-step survey.
-- Persistent storage of user profiles in a local SQLite database.
-- Skill tracking, where each user can attach multiple skills, each with a duration and description, stored in a linked table.
-- AI-generated career roadmaps based on the full user profile, including all recorded skills.
-- Profile management commands to view, update, and delete stored information.
-- Output formatted as plain text and length-checked to comply with Telegram's message limits.
+## What it can do
 
-## Requirements
+- Walk a new user through registration one question at a time.
+- Remember everyone's profile in a local database, so it's all still there next time.
+- Let users add as many skills as they want, each with how long they've done it and a short description.
+- Generate a full career roadmap from the AI that actually takes those skills into account.
+- Let people view, update, or delete their info whenever they like.
+- Keep the AI's reply clean and short enough that Telegram will actually send it.
+
+## What you'll need
 
 - Python 3.10 or newer
-- A Telegram bot token from BotFather
-- A Google Gemini API key from Google AI Studio
+- A Telegram bot token (you get this from BotFather)
+- A Google Gemini API key (grab one from Google AI Studio)
 
-### Python dependencies
+You'll also need three Python packages:
 
 - pyTelegramBotAPI
 - requests
 - python-dotenv
 
-Install them with:
+Install them in one go:
 
 ```
 pip install pyTelegramBotAPI requests python-dotenv
 ```
 
-## Configuration
+## Setting it up
 
-Create a file named `.env` in the project root with the following values:
+Make a file called `.env` in the project folder and drop your two keys in it:
 
 ```
 TOKEN=your_telegram_bot_token
 GeminiAPI=your_gemini_api_key
 ```
 
-The `.env` file is loaded automatically at runtime. It should never be committed to version control. Add the following to a `.gitignore` file:
+The bot reads this file automatically when it starts. One important thing: never commit this file to GitHub. Those keys are basically passwords. Make a `.gitignore` and add these lines so you don't leak anything by accident:
 
 ```
 .env
@@ -56,98 +58,100 @@ __pycache__/
 *.db
 ```
 
-## Database Schema
+## The database
 
-The application uses a single SQLite database file, `tegUsers.db`, created automatically on first run. It contains two tables.
+Everything is stored in a single SQLite file called `tegUsers.db`. You don't have to create it yourself. The bot builds it the first time it runs. There are two tables inside.
 
 ### tegUsers
 
-Stores one row per registered user.
+One row for each person who registers.
 
-| Column | Type | Description |
+| Column | Type | What it holds |
 | --- | --- | --- |
-| id | INTEGER | Primary key, auto-incremented |
-| user_id | INTEGER | Telegram user ID, unique |
-| username | TEXT | User-provided name |
-| age | INTEGER | User age |
-| degree_yn | TEXT | Whether the user holds a degree |
-| speciality | TEXT | Field of study or experience |
-| have_device_laptop | TEXT | Whether the user owns a laptop |
-| state | TEXT | Current position in the conversation flow |
+| id | INTEGER | The primary key, counts up on its own |
+| user_id | INTEGER | The person's Telegram ID, has to be unique |
+| username | TEXT | The name they gave |
+| age | INTEGER | Their age |
+| degree_yn | TEXT | Whether they have a degree |
+| speciality | TEXT | Their field or area of experience |
+| have_device_laptop | TEXT | Whether they own a laptop |
+| state | TEXT | Where they currently are in the conversation |
 
 ### userSkills
 
-Stores one row per skill. Each row links back to a user through `user_id`, allowing a single user to have many skills.
+One row per skill. Each skill points back to its owner through `user_id`, which is what lets a single person have a whole list of skills.
 
-| Column | Type | Description |
+| Column | Type | What it holds |
 | --- | --- | --- |
-| id | INTEGER | Primary key, auto-incremented |
-| user_id | INTEGER | Foreign key referencing tegUsers.user_id |
-| skill | TEXT | Name of the skill |
-| forHowLong | TEXT | Years of experience with the skill |
-| description | TEXT | Short description of the user's experience |
+| id | INTEGER | The primary key, counts up on its own |
+| user_id | INTEGER | Links the skill back to a user in tegUsers |
+| skill | TEXT | The name of the skill |
+| forHowLong | TEXT | How many years they've done it |
+| description | TEXT | A quick note about their experience |
 
-Both tables are created with `CREATE TABLE IF NOT EXISTS`, so starting the application is sufficient to provision the schema. No manual setup is required.
+Both tables are created with `CREATE TABLE IF NOT EXISTS`, which is a fancy way of saying the bot only makes them if they aren't already there. So just starting the bot is enough. There's nothing to set up by hand.
 
-## Commands
+## The commands
 
-| Command | Description |
+| Command | What it does |
 | --- | --- |
-| /start | Display a welcome message |
-| /help | List all available commands |
-| /register | Begin the registration survey |
-| /addskill | Add a skill with experience and description |
-| /recommend | Generate a personalized career roadmap |
-| /view | Display the user's stored information |
-| /update | Update the user's stored information |
-| /delete | Delete the user's profile and all associated skills |
+| /start | Says hello |
+| /help | Lists everything you can do |
+| /register | Starts the sign-up questions |
+| /addskill | Adds a skill, with experience and a description |
+| /recommend | Generates your personalized roadmap |
+| /view | Shows you what the bot has stored about you |
+| /update | Lets you change your stored info |
+| /delete | Wipes your profile and all your skills |
 
-## Conversation Flow
+## How the conversation actually works
 
-The bot tracks each user's progress through a `state` field stored in the database. A catch-all message handler reads the current state and routes the user's next message accordingly.
+The bot keeps track of where each person is using a `state` value saved in the database. There's one handler that catches every message, checks what state you're in, and figures out what your message means based on that.
 
-Registration advances through the following states: awaiting name, awaiting age, awaiting degree, awaiting specialty, and awaiting device. On completion, the state is set to `Registered`.
+Registration moves through a series of steps: name, then age, then degree, then specialty, then laptop. Once you've answered them all, your state flips to `Registered` and you're done.
 
-Adding a skill advances through three states: awaiting skill, awaiting years of experience, and awaiting description. The skill row is created when the first answer is received and is then completed field by field as the remaining answers arrive. On completion, the state returns to `Registered`, and the user may add additional skills by repeating the command.
+Adding a skill works the same way but in three steps: the skill itself, then how many years, then a description. Here's the slightly clever part: the moment you type the skill name, the bot creates the row in the database, then fills in the other two answers as they come in. When it's finished, you go back to `Registered`, and you can run the command again to add another skill whenever you want.
 
-## How Recommendations Are Generated
+## How the roadmap gets made
 
-When a registered user runs `/recommend`, the bot retrieves the user's profile and all recorded skills, then constructs a prompt for the Gemini API. The prompt includes the user's age, education, specialty, device availability, and a formatted list of their skills, along with formatting instructions that keep the response within Telegram's character limit and free of markdown symbols.
+When a registered user runs `/recommend`, the bot pulls up their profile and every skill they've saved, then builds a prompt for the Gemini API. That prompt includes their age, education, specialty, whether they have a laptop, and a tidy list of their skills, plus some instructions telling the AI to keep the reply short and skip the markdown symbols (Telegram doesn't love those).
 
-The request targets the `gemini-2.5-flash` model with internal reasoning disabled, so that the full output budget is spent on the answer itself. The response is parsed defensively: if the model returns no usable text, a descriptive error is raised rather than failing silently. Before being returned, the text is stripped of stray markdown and truncated if necessary to remain within the 4,096-character limit imposed by Telegram.
+The request goes to the `gemini-2.5-flash` model with its internal "thinking" turned off. That last part matters: this model can spend its whole word budget reasoning to itself and leave nothing for the actual answer, so switching that off makes sure all of it goes into the response you actually see.
 
-## Running the Bot
+The reply is then handled carefully. If the AI sends back nothing usable, the bot raises a clear error instead of crashing in some confusing way. Before the text goes out, any leftover markdown is stripped off and the message is trimmed if it's too long, so it always stays under Telegram's 4,096-character ceiling.
 
-With the environment configured and dependencies installed, start the bot from the project root:
+## Running it
+
+Once your keys are in place and the packages are installed, start the bot from the project folder:
 
 ```
 python main.py
 ```
 
-The bot registers its command menu with Telegram and begins long polling. A confirmation message is printed to the console once it is running.
+It'll register its command menu with Telegram, start listening, and print a message to your console letting you know it's alive.
 
-To test the recommendation logic in isolation without launching the full bot, run the logic module directly:
+If you just want to test the AI part on its own without firing up the whole bot, you can run the logic file directly:
 
 ```
 python logic.py
 ```
 
-This executes a sample recommendation call and prints the result.
+That makes one sample recommendation and prints it out, which is handy for quick checks.
 
-## Project Structure
+## What's where
 
 ```
 .
-├── main.py          Telegram command handlers and conversation flow
-├── logic.py         Database operations and Gemini API integration
-├── tegUsers.db      SQLite database (created automatically)
-├── .env             Environment variables (not committed)
-└── README.md        Project documentation
+├── main.py          The Telegram side: commands and conversation
+├── logic.py         The database and the Gemini API calls
+├── tegUsers.db      The SQLite database (made automatically)
+├── .env             Your secret keys (never commit this)
+└── README.md        You're reading it
 ```
 
-## Notes and Limitations
+## A few things worth knowing
 
-- The Gemini free tier is subject to regional availability and rate limits. If requests return a quota error with a limit of zero, enabling billing on the associated Google Cloud project, even with a minimal budget alert, typically resolves access.
-- Telegram requires all command names to be lowercase. Command identifiers must not contain uppercase characters.
-- The database connection is opened with `check_same_thread=False` to support the bot's polling model. For higher-concurrency deployments, a connection-pooling approach is recommended.
-- API keys and tokens must be kept private. Any credential that is exposed should be revoked and regenerated immediately.
+- Gemini's free tier isn't available everywhere, and it has rate limits. If you ever get a quota error that says your limit is zero, turning on billing for your Google Cloud project usually fixes it. You can set a tiny budget alert so you're never actually charged for normal use.
+- Telegram is picky about command names: they have to be all lowercase. No capital letters allowed, which is why it's `/addskill` and not `/AddSkill`.
+- The database connection uses `check_same_thread=False` so it plays nicely with the bot's polling. If you ever scale this up to handle a lot of users at once, you'd want to look into proper connection pooling.
+- Keep your keys to yourself. If one ever slips out, revoke it and make a new one right away. It only takes a second and it'll save you a headache.
