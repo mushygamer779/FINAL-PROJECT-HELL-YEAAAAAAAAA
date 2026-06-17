@@ -11,6 +11,7 @@ class BotFunc:
         self.conn = sqlite3.connect(self.db_name, check_same_thread=False)
         self.cursor = self.conn.cursor()
         self.create_table()
+        self.create_skills_table()
 
     def create_table(self):
         self.cursor.execute('''CREATE TABLE IF NOT EXISTS tegUsers (
@@ -24,7 +25,44 @@ class BotFunc:
                                 state TEXT
                             )''')
         self.conn.commit()
-        
+
+    def create_skills_table(self):
+        self.cursor.execute('''CREATE TABLE IF NOT EXISTS userSkills (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                user_id INTEGER,
+                                skill TEXT,
+                                forHowLong TEXT,
+                                description TEXT,
+                                FOREIGN KEY (user_id) REFERENCES tegUsers(user_id)
+                            )''')
+        self.conn.commit()
+
+    def start_skill(self, user_id, skill):
+        self.cursor.execute('''INSERT INTO userSkills (user_id, skill, forHowLong, description)
+                            VALUES (?, ?, NULL, NULL)''', (user_id, skill))
+        self.conn.commit()
+
+    def update_latest_skill(self, user_id, forHowLong=None, description=None):
+        self.cursor.execute('''SELECT id FROM userSkills WHERE user_id = ? ORDER BY id DESC LIMIT 1''', (user_id,))
+        row = self.cursor.fetchone()
+        if row:
+            skill_id = row[0]
+            if forHowLong is not None:
+                self.cursor.execute('''UPDATE userSkills SET forHowLong = ? WHERE id = ?''', (forHowLong, skill_id))
+            if description is not None:
+                self.cursor.execute('''UPDATE userSkills SET description = ? WHERE id = ?''', (description, skill_id))
+            self.conn.commit()
+
+    def get_skills(self, user_id):
+        self.cursor.execute('SELECT * FROM userSkills WHERE user_id = ?', (user_id,))
+        rows = self.cursor.fetchall()
+        columns = ['id', 'user_id', 'skill', 'forHowLong', 'description']
+        return [dict(zip(columns, row)) for row in rows]
+
+    def delete_skills(self, user_id):
+        self.cursor.execute('''DELETE FROM userSkills WHERE user_id = ?''', (user_id,))
+        self.conn.commit()
+
     def register_user(self, user_id, username, age, degree_yn, speciality, have_device_laptop, state):
         self.cursor.execute('''INSERT INTO tegUsers 
                             (user_id, username, age, degree_yn, speciality, have_device_laptop, state)
@@ -45,6 +83,7 @@ class BotFunc:
         rows = self.cursor.fetchall()
         columns = ['id', 'user_id', 'username', 'age', 'degree_yn', 'speciality', 'have_device_laptop', 'state']
         return [dict(zip(columns, row)) for row in rows]
+        
 
     def update_user(self, user_id, username=None, age=None, degree_yn=None, speciality=None, have_device_laptop=None, state=None):
         self.cursor.execute('''SELECT * FROM tegUsers WHERE user_id = ?''', (user_id,))
@@ -75,18 +114,12 @@ class BotFunc:
         self.conn.commit()
    
 
-    def recommend(self, age: int, has_degree: str, specialty: str, have_device_laptop: str) -> str:
+    def recommend(self, age: int, has_degree: str, specialty: str, have_device_laptop: str, user_id: int = None) -> str:
         """
-        Generate personalized wealth-building advice using the Google Gemini API.
+        Generate a Telegram-ready 'first $100k while unemployed' roadmap using the Gemini API.
 
-        Args:
-            age                (int): The person's age, e.g. 27
-            has_degree         (str): "yes" or "no"
-            specialty          (str): Field of study or experience, e.g. "Computer Science"
-            have_device_laptop (str): "yes" or "no"
-
-        Returns:
-            str: Step-by-step wealth-building roadmap
+        Returns clean plain text (no markdown asterisks) that fits within
+        Telegram's 4096-character message limit.
 
         Example:
             >>> print(recommend(27, "yes", "Computer Science", "yes"))
@@ -94,52 +127,67 @@ class BotFunc:
 
         # ── Load env & build URL ──────────────────────────────────────────
         load_dotenv()
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={os.getenv('GeminiAPI')}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={os.getenv('GeminiAPI')}"
 
         # ── Normalise inputs ──────────────────────────────────────────────
         has_degree         = str(has_degree).strip().lower()
         have_device_laptop = str(have_device_laptop).strip().lower()
         specialty          = str(specialty).strip()
 
-        # ── Build the prompt ──────────────────────────────────────────────
-        prompt = f"""You are a world-class financial strategist, entrepreneur, and career coach.
+        # ── Pull the user's saved skills (if any) ─────────────────────────
+        skills_block = "They have not listed any extra skills."
+        if user_id is not None:
+            skills = self.get_skills(user_id)
+            lines = []
+            for s in skills:
+                if s['skill']:  # ignore any half-finished entries
+                    lines.append(f"- {s['skill']} | {s['forHowLong']} years | {s['description']}")
+            if lines:
+                skills_block = "Skills and experience they personally listed:\n" + "\n".join(lines)
 
-            A person has come to you with the following profile:
+        # ── Build the prompt ──────────────────────────────────────────────
+        prompt = f"""You are a brutally honest wealth coach and career strategist who has helped thousands of unemployed people earn their first $100,000.
+
+            Here is the person in front of you:
             - Age: {age}
             - Has a University Degree: {has_degree}
             - Field of Specialty / Experience: {specialty}
             - Has a Laptop: {have_device_laptop}
 
-            Your job is to help this person build serious wealth from where they are right now.
+            {skills_block}
 
-            Do the following:
-            1. Analyse the CURRENT market opportunity in their specialty field (2-3 sentences). What is hot, what pays well, what is growing fast?
-            2. Based on their profile and market analysis, give them a brutally honest, actionable, step-by-step roadmap to build wealth.
-            3. Each step must be SPECIFIC — not "learn Python", but "spend 2 hours daily on Python via freeCodeCamp for 3 months then build 2 portfolio projects".
-            4. Consider their age, whether their degree adds value or they need to self-learn, and whether having no laptop limits them (and how to work around it).
-            5. Include income milestones and realistic timelines.
+            This person is currently UNEMPLOYED and wants a realistic, real-life plan to make their first $100,000 total income. No fluff, no get-rich-quick nonsense. Real, proven paths.
 
-            Format your response EXACTLY like this:
+            Tailor everything to their age, degree, specialty, whether they have a laptop, AND the specific skills they listed above. If they listed skills, build the roadmap around their strongest ones.
 
-            **Market Opportunity Analysis:**
-            [2-3 sentences on current market trends, demand, and earning potential in their field]
+            IMPORTANT FORMATTING RULES (this will be sent as a plain Telegram message):
+            - Do NOT use any markdown, asterisks, bold, or special symbols.
+            - Use plain text only. For section titles, just write them on their own line followed by a colon.
+            - Use simple numbered lists like "1." for steps.
+            - Keep the WHOLE response UNDER 3500 characters so it fits in one Telegram message. Be concise and punchy.
 
-            **Your Wealth-Building Roadmap:**
-            [One motivating sentence tailored to their profile]
+            Structure your answer like this:
 
-            **Step-by-Step Action Plan:**
-            1. [Specific action — include what, how, how long]
-            2. [Specific action — include what, how, how long]
-            3. [Keep going for 7-10 steps]
+            MARKET OPPORTUNITY ANALYSIS:
+            [2-3 sentences on what is in demand in {specialty} right now and realistic entry points.]
 
-            **Income Milestones:**
-            - Month 3: [Realistic earning expectation]
-            - Month 6: [Realistic earning expectation]
-            - Year 1:  [Realistic earning expectation]
-            - Year 3:  [Realistic earning expectation]
+            YOUR STEP-BY-STEP ROADMAP TO YOUR FIRST 100K:
+            1. [Concrete first action - what to do and how.]
+            2. [The in-demand skill to learn and a free/cheap resource.]
+            3. [Build a portfolio - free/cheap work to prove yourself.]
+            4. [Start charging - where to find paying work, what to charge.]
+            5. [Scale up - raise rates or move to higher-paying roles.]
+            6. [Continue for 7-8 total steps until it realistically reaches 100k.]
 
-            **Timeline to First $10,000:**
-            [Honest, specific estimate based on their profile]"""
+            INCOME MILESTONES:
+            - First $1,000: [how and when]
+            - First $10,000: [how and when]
+            - First $100,000: [how and when]
+
+            THE ONE THING THAT MATTERS MOST FOR YOU:
+            [One blunt, personalized sentence based on their exact situation.]
+
+            Make sure the whole response is complete and stays under 3500 characters."""
 
         # ── Call the Gemini REST API ──────────────────────────────────────
         payload = {
@@ -149,8 +197,11 @@ class BotFunc:
                 }
             ],
             "generationConfig": {
-                "temperature": 0.7,
-                "maxOutputTokens": 1024,
+                "temperature": 0.8,
+                "maxOutputTokens": 4096,
+                "thinkingConfig": {
+                    "thinkingBudget": 0
+                }
             }
         }
 
@@ -165,19 +216,32 @@ class BotFunc:
 
         data = response.json()
 
-        # ── Extract the text ──────────────────────────────────────────────
+        # ── Extract the text (robustly) ───────────────────────────────────
         try:
-            advice = data["candidates"][0]["content"]["parts"][0]["text"]
+            candidate = data["candidates"][0]
+            parts = candidate.get("content", {}).get("parts")
+            if not parts:
+                reason = candidate.get("finishReason", "UNKNOWN")
+                raise RuntimeError(
+                    f"Model returned no text (finishReason={reason}). Full response: {data}"
+                )
+            advice = parts[0]["text"]
         except (KeyError, IndexError) as e:
             raise RuntimeError(f"Unexpected response structure: {data}") from e
 
-        return advice
+        # ── Make it Telegram-safe ─────────────────────────────────────────
+        advice = advice.replace("**", "").replace("__", "").strip()  # strip markdown
+        if len(advice) > 4096:                                       # enforce Telegram's hard limit
+            advice = advice[:4090].rsplit("\n", 1)[0] + "\n..."
 
+        return advice
 
 
 if __name__ == "__main__":
     bot_func = BotFunc("tegUsers.db")
     bot_func.create_table()
     print("This is the logic module.")
-    # bot_func.delete_user('6666483906')
-    print(bot_func.recommend(age=27, has_degree="yes", specialty="Computer Science", have_device_laptop="yes"))
+    # bot_func.delete_user('6666483906')o
+    # print(bot_func.recommend(age=27, has_degree="yes", specialty="Computer Science", have_device_laptop="yes"))
+    #bot_func.create_skills_table()
+    print(bot_func.showAllUsers())
